@@ -21,13 +21,14 @@ namespace BinanceDemoBot
             var apiKey = Environment.GetEnvironmentVariable("BINANCE_TESTNET_API_KEY");
             var apiSecret = Environment.GetEnvironmentVariable("BINANCE_TESTNET_SECRET");
 
-            if (string.IsNullOrEmpty(apiSecret) || apiSecret == "your_secret_here")
+            if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret))
             {
-                Console.WriteLine("⚠️ Alert: Add API SECRET to code or env var (BINANCE_TESTNET_SECRET)!");
+                Console.WriteLine("⚠️ Alert: Set BINANCE_TESTNET_API_KEY and BINANCE_TESTNET_SECRET env vars!");
                 return;
             }
-            Console.WriteLine(apiKey);
-            Console.WriteLine(apiSecret);
+
+            Console.WriteLine($"Debug API Key: {apiKey}");
+            Console.WriteLine($"Debug API Secret: {apiSecret}");
 
             // Init Connector & Log Server Time
             var connector = new BinanceConnector(apiKey, apiSecret);
@@ -55,18 +56,17 @@ namespace BinanceDemoBot
         {
             _apiKey = apiKey;
             _apiSecret = apiSecret;
-            // Console Logger w/ Package
             using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
             _logger = loggerFactory.CreateLogger<BinanceConnector>();
         }
 
         public async Task ConnectAndLogAsync()
         {
-            _logger.LogInformation("🔌 Connecting to Binance Testnet (Spot API v3)...");
+            _logger.LogInformation("🔌 Connecting to Binance Demo (Spot API v3)...");
 
             var client = new BinanceRestClient(options =>
             {
-                options.Environment = BinanceEnvironment.Demo;  // Testnet Env
+                options.Environment = BinanceEnvironment.Demo;
                 options.ApiCredentials = new ApiCredentials(_apiKey, _apiSecret);
             });
 
@@ -83,6 +83,7 @@ namespace BinanceDemoBot
                     _logger.LogInformation($"✅ Connected! Server Time: {serverTime:yyyy-MM-dd HH:mm:ss} UTC");
                     _logger.LogInformation($"   Local Time: {localTime:yyyy-MM-dd HH:mm:ss} UTC | Offset: {offsetMs}ms (Sync OK if <50ms)");
                     _logger.LogInformation($"   BTC Spot Ready: 1k€ Sim w/ 0.001 BTC Orders | Docs: /api/v3/klines for Vol Data");
+                    Console.WriteLine();
                 }
                 else
                 {
@@ -114,7 +115,6 @@ namespace BinanceDemoBot
         {
             _apiKey = apiKey;
             _apiSecret = apiSecret;
-            // Console Logger w/ Package
             using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
             _logger = loggerFactory.CreateLogger<TestOrderManager>();
         }
@@ -122,17 +122,18 @@ namespace BinanceDemoBot
         public async Task PlaceTestOrdersAsync()
         {
             _logger.LogInformation("🧪 Firing Test Orders: BTC/USDT Spot (Mock—Docs: /api/v3/order/test)");
+            Console.WriteLine();
 
             var client = new BinanceRestClient(options =>
             {
-                options.Environment = BinanceEnvironment.Demo;  // Testnet Env
+                options.Environment = BinanceEnvironment.Demo;
                 options.ApiCredentials = new ApiCredentials(_apiKey, _apiSecret);
             });
 
             try
             {
                 // Test Buy: Market (Taker Sim) | Qty Scaled for 1k€ Acct
-                var testBuyResult = await client.SpotApi.Trading.PlaceTestOrderAsync(
+                var testBuyResult = await client.SpotApi.Trading.PlaceOrderAsync(
                     symbol: "BTCUSDT",
                     side: OrderSide.Buy,
                     type: SpotOrderType.Market,
@@ -141,33 +142,37 @@ namespace BinanceDemoBot
 
                 if (testBuyResult.Success)
                 {
-                    _logger.LogInformation($"✅ Test BUY Executed (Mock): Qty: 0.001 BTC (No OrderId for Test)");
-                    _logger.LogInformation($"   Est Entry: ~108.50 USDT | RR: 1:2 | +2.17€ TP / -1.08€ SL (1% Risk)");
+                    _logger.LogInformation($"✅ Test BUY Executed (Mock): Qty: 0.001 BTC (No {testBuyResult.RequestId} for Test)");
+                    //_logger.LogInformation($"   Est Entry: ~108.50 USDT | RR: 1:2 | +2.17€ TP / -1.08€ SL (1% Risk)");
                 }
                 else
                 {
                     _logger.LogError($"❌ Test BUY Fail: {testBuyResult.Error?.Message} | Verify Trading Perms + IP Whitelist");
                 }
 
+                Console.WriteLine();
+
                 // Test Sell: Limit TP @ +1% | Maker Fee Edge
-                var testSellResult = await client.SpotApi.Trading.PlaceTestOrderAsync(
+                var testSellResult = await client.SpotApi.Trading.PlaceOrderAsync(
                     symbol: "BTCUSDT",
                     side: OrderSide.Sell,
-                    type: SpotOrderType.Limit,
-                    timeInForce: TimeInForce.GoodTillCanceled,
-                    quantity: 0.001m,
-                    price: 109580m  // +1% Target
+                    type: SpotOrderType.Market,                 
+                    //timeInForce: TimeInForce.GoodTillCanceled,
+                    quantity: 0.001m
+                    //price: 109580m  // +1% Target
                 );
 
                 if (testSellResult.Success)
                 {
-                    _logger.LogInformation($"✅ Test SELL Queued (Mock): TP @ 109,580 USDT (No OrderId for Test)");
-                    _logger.LogInformation($"   Fees Est: 0.2% RT = -0.22€ | Net: +1.95€ (Spot) | Vol Edge: 1.65% Daily Avg");
+                    _logger.LogInformation($"✅ Test SELL Queued (Mock): TP @ 109,580 USDT (No {testSellResult.RequestId} for Test)");
+                    //_logger.LogInformation($"   Fees Est: 0.2% RT = -0.22€ | Net: +1.95€ (Spot) | Vol Edge: 1.65% Daily Avg");
                 }
                 else
                 {
                     _logger.LogError($"❌ Test SELL Fail: {testSellResult.Error?.Message} | Verify Trading Perms + IP Whitelist");
                 }
+
+                Console.WriteLine();
 
                 _logger.LogInformation("📈 Test Suite Done: 2 Orders | Next: Add Klines Fetch (/api/v3/klines)");
             }
