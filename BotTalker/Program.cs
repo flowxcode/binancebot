@@ -1,11 +1,8 @@
 ﻿// See https://aka.ms/new-console-template for more information
 // Binance Demo Bot: Testnet w/ v11 Fixes | Oct 24, 2025
-using System;
-using System.Threading.Tasks;
 using Binance.Net;
 using Binance.Net.Clients;
 using Binance.Net.Enums;
-using Binance.Net.Objects;
 using CryptoExchange.Net.Authentication;
 using Microsoft.Extensions.Logging;
 
@@ -136,43 +133,69 @@ namespace BinanceDemoBot
                 var testBuyResult = await client.SpotApi.Trading.PlaceOrderAsync(
                     symbol: "BTCUSDT",
                     side: OrderSide.Buy,
-                    type: SpotOrderType.Market,
-                    quantity: 0.001m  // ~108 USD | 10% Alloc on 1k€
+                    type: SpotOrderType.LimitMaker,
+                    quantity: 0.001m // ~108 USD | 10% Alloc on 1k€
+                    ,
+                    price: 109580m
                 );
-
                 if (testBuyResult.Success)
                 {
-                    _logger.LogInformation($"✅ Test BUY Executed (Mock): Qty: 0.001 BTC (No {testBuyResult.RequestId} for Test)");
-                    //_logger.LogInformation($"   Est Entry: ~108.50 USDT | RR: 1:2 | +2.17€ TP / -1.08€ SL (1% Risk)");
+                    _logger.LogInformation($"✅ Test BUY Executed (Mock): Qty: 0.001 BTC (No {testBuyResult.Data.Id} for Test)");
+                    //_logger.LogInformation($" Est Entry: ~108.50 USDT | RR: 1:2 | +2.17€ TP / -1.08€ SL (1% Risk)");
                 }
                 else
                 {
                     _logger.LogError($"❌ Test BUY Fail: {testBuyResult.Error?.Message} | Verify Trading Perms + IP Whitelist");
                 }
-
                 Console.WriteLine();
 
-                // Test Sell: Limit TP @ +1% | Maker Fee Edge
-                var testSellResult = await client.SpotApi.Trading.PlaceOrderAsync(
-                    symbol: "BTCUSDT",
-                    side: OrderSide.Sell,
-                    type: SpotOrderType.Market,                 
-                    //timeInForce: TimeInForce.GoodTillCanceled,
-                    quantity: 0.001m
-                    //price: 109580m  // +1% Target
-                );
+                //// Test Sell: Limit TP @ +1% | Maker Fee Edge
+                //var testSellResult = await client.SpotApi.Trading.PlaceOrderAsync(
+                //    symbol: "BTCUSDT",
+                //    side: OrderSide.Sell,
+                //    type: SpotOrderType.Market,
+                //    //timeInForce: TimeInForce.GoodTillCanceled,
+                //    quantity: 0.001m
+                ////price: 109580m // +1% Target
+                //);
+                //if (testSellResult.Success)
+                //{
+                //    _logger.LogInformation($"✅ Test SELL Queued (Mock): TP @ 109,580 USDT (No {testSellResult.Data.Id} for Test)");
+                //    //_logger.LogInformation($" Fees Est: 0.2% RT = -0.22€ | Net: +1.95€ (Spot) | Vol Edge: 1.65% Daily Avg");
+                //}
+                //else
+                //{
+                //    _logger.LogError($"❌ Test SELL Fail: {testSellResult.Error?.Message} | Verify Trading Perms + IP Whitelist");
+                //}
+                //Console.WriteLine();
 
-                if (testSellResult.Success)
+                // Fetch: GET /api/v3/openOrders (Weight: 3, up to 500 last)
+                var openOrdersResult = await client.SpotApi.Trading.GetOpenOrdersAsync(symbol: "BTCUSDT");  // Or null for all symbols
+
+                if (openOrdersResult.Success)
                 {
-                    _logger.LogInformation($"✅ Test SELL Queued (Mock): TP @ 109,580 USDT (No {testSellResult.RequestId} for Test)");
-                    //_logger.LogInformation($"   Fees Est: 0.2% RT = -0.22€ | Net: +1.95€ (Spot) | Vol Edge: 1.65% Daily Avg");
+                    var orders = openOrdersResult.Data;
+                    if (orders.ToList().Count == 0)
+                    {
+                        _logger.LogInformation("✅ No Open Orders: Clean Slate | Ready for Next Signal");
+                    }
+                    else
+                    {
+                        _logger.LogInformation($"📋 Found {orders.ToList().Count} Open Orders:");
+                        foreach (var order in orders)
+                        {
+                            _logger.LogInformation($"  - Order ID: {order.Id} | Side: {order.Side} | Type: {order.Type}");
+                            _logger.LogInformation($"    Qty: {order.Quantity} BTC | Price: {order.Price} USDT | Status: {order.Status}");
+                            _logger.LogInformation($"    Time: {order.CreateTime:yyyy-MM-dd HH:mm:ss} UTC | Est Fill: ~{order.QuantityFilled} BTC");
+                            // Sim P&L: Add custom calc if needed, e.g., RR 1:2 on 1% Risk
+                            Console.WriteLine();
+                        }
+                    }
                 }
                 else
                 {
-                    _logger.LogError($"❌ Test SELL Fail: {testSellResult.Error?.Message} | Verify Trading Perms + IP Whitelist");
+                    _logger.LogError($"❌ Fetch Fail: {openOrdersResult.Error?.Message} | Check Key/Perms or IP Whitelist");
                 }
-
-                Console.WriteLine();
 
                 _logger.LogInformation("📈 Test Suite Done: 2 Orders | Next: Add Klines Fetch (/api/v3/klines)");
             }
