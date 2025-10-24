@@ -43,7 +43,7 @@ namespace BinanceDemoBot
 
             // Init Connector & Log Server Time
             var connector = new BinanceConnector(apiKey, apiSecret);
-            await connector.ConnectAndLogAsync();
+            //await connector.ConnectAndLogAsync();
 
             // Fire Demo Orders
             var orderManager = new TestOrderManager(apiKey, apiSecret);

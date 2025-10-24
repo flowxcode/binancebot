@@ -130,6 +130,7 @@ public class TestOrderManager
         {
             // Define allocation percentage (e.g., 10% of available USDT as margin)
             decimal allocationPercentage = 0.10m;  // 10%
+            //decimal allocationPercentage = 1;  // 10%
             int leverage = 10;
 
             // First, set leverage if not already
@@ -163,24 +164,35 @@ public class TestOrderManager
             decimal desiredMargin = availableUsdt * allocationPercentage;
             decimal quoteQuantity = desiredMargin * leverage;  // Notional in USDT
 
-            // Round quoteQuantity to valid precision (e.g., 2 decimals for USDT; check symbol info)
-            quoteQuantity = Math.Floor(quoteQuantity * 100) / 100;  // Example: floor to 0.01 USDT
+            // Fetch current price for BTCUSDT
+            var priceResponse = await client.UsdFuturesApi.ExchangeData.GetPriceAsync("BTCUSDT");
+            if (!priceResponse.Success)
+            {
+                // Handle error, e.g., Console.WriteLine(priceResponse.Error.Message);
+                return;
+            }
+            decimal currentPrice = priceResponse.Data.Price;
 
-            // Ensure minimum (e.g., ~5-10 USDT notional; adjust per Binance rules)
-            if (quoteQuantity < 10m)
+            var quantityBtc = quoteQuantity / currentPrice;
+
+            // Round quantity to the symbol's stepSize precision (e.g., 0.001 for BTCUSDT; fetch via GetExchangeInfoAsync if needed)
+            quantityBtc = Math.Floor(quantityBtc * 1000) / 1000; // Example: floor to 0.001 BTC
+
+            // Ensure minimum quantity (e.g., 0.001 BTC; adjust per symbol rules)
+            if (quantityBtc < 0.001m)
             {
                 // Handle: too small
-                quoteQuantity = 10m;
+                quantityBtc = 0.001m;
             }
 
-            Console.WriteLine("try availableUsdt: {availableUsdt} desiredMargin: {desiredMargin} quoteQuantity: {quoteQuantity}")
+            Console.WriteLine($"try availableUsdt: {availableUsdt} desiredMargin: {desiredMargin} quantityBtc: {quantityBtc}");
 
             // Place the long market order using quoteQuantity
             var orderResponse = await client.UsdFuturesApi.Trading.PlaceOrderAsync(
                 symbol: "BTCUSDT",
                 side: OrderSide.Buy,
                 type: FuturesOrderType.Market,
-                quantity: quoteQuantity
+                quantity: quantityBtc
             );
 
             if (orderResponse.Success)
